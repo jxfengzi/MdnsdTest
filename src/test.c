@@ -1,7 +1,12 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
+
+#ifdef _WIN32
+#else
 #include <unistd.h>
+#endif
+
 #include <dns_sd.h> 
 
 
@@ -174,6 +179,25 @@ void command(const char *buf)
     }
 }
 
+
+#ifdef _WIN32
+void cmd_loop()
+{
+	char buf[1024];
+
+	g_loop = 1;
+
+	while (g_loop)
+	{
+		int ret = 0;
+		memset(buf, 0, 1024);
+
+		printf("> ");
+		ret = scanf("%s", buf);
+		command(buf);
+	}
+}
+#else /* Linux 
 static
 void cmd_post_select(fd_set *p_read_set, fd_set *p_write_set, fd_set *p_error_set)
 {
@@ -213,7 +237,7 @@ void cmd_pre_select(int *p_max_soc, fd_set *p_read_set, fd_set *p_write_set, fd_
 }
 
 /**
- * @brief Linuxƽ̨�����У��ȴ��û���������ָ�ִ��
+ * @brief Linux??????????????У??????????????????????????????????????????
  */
 void cmd_loop()
 {
@@ -244,10 +268,11 @@ void cmd_loop()
 
     printf("-------------- cmd_run -----------------\n");
 }
+#endif
 
 int main()
 {
-    discoveryService("_airplay._tcp", "local.", &gBonjour);
+    discoveryService("_airplay._tcp.", "local.", &gBonjour);
 
     cmd_loop();
 
