@@ -33,6 +33,20 @@ SET(CtMemory_Source
 SOURCE_GROUP(memory\\headers        FILES     ${CtMemory_Header})
 SOURCE_GROUP(memory\\sources        FILES     ${CtMemory_Source})
 
+# CtSocket
+SET(CtSocket_Header
+    CtSocket/src/ct_socket.h
+    CtSocket/src/CtSelector.h
+    CtSocket/src/CtSocketIpc.h)
+
+SET(CtSocket_Source
+    CtSocket/src/ct_socket.c
+    CtSocket/src/CtSelector.c
+    CtSocket/src/CtSocketIpc.c)
+
+SOURCE_GROUP(socket\\headers        FILES     ${CtSocket_Header})
+SOURCE_GROUP(socket\\sources        FILES     ${CtSocket_Source})
+
 # CtThread
 SET(CtThread_Header
     CtThread/src/CtThread.h
@@ -48,6 +62,26 @@ SET(CtThread_Source
 
 SOURCE_GROUP(thread\\headers        FILES     ${CtThread_Header})
 SOURCE_GROUP(thread\\sources        FILES     ${CtThread_Source})
+
+# CtTimer
+SET(CtTimer_Header
+    CtTimer/src/CtTimer.h)
+
+SET(CtTimer_Source
+    CtTimer/src/CtTimer.c)
+
+SOURCE_GROUP(timer\\headers         FILES     ${CtTimer_Header})
+SOURCE_GROUP(timer\\sources         FILES     ${CtTimer_Source})
+
+# CtUuid
+SET(CtUuid_Header
+    CtUuid/src/CtUuid.h)
+
+SET(CtUuid_Source
+    CtUuid/src/CtUuid.c)
+
+SOURCE_GROUP(uuid\\headers          FILES     ${CtUuid_Header})
+SOURCE_GROUP(uuid\\sources          FILES     ${CtUuid_Source})
 
 # CtBonjour
 SET(CtBonjour_Header
@@ -65,10 +99,16 @@ SET(SRC
     ${CtCommon_Source}
     ${CtMemory_Header}
     ${CtMemory_Source}
+    ${CtSocket_Header}
+    ${CtSocket_Source}
     ${CtThread_Header}
     ${CtThread_Source}
     ${CtBonjour_Header}
     ${CtBonjour_Source}
+    ${CtTimer_Header}
+    ${CtTimer_Source}
+    ${CtUuid_Header}
+    ${CtUuid_Source}
     )
 
 #----------------------------------------------------------------------------

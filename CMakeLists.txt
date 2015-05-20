@@ -70,7 +70,10 @@ ENDIF(WIN32)
 INCLUDE_DIRECTORIES(${PROJECT_SOURCE_DIR}/mdnsresponder/mDNSShared)
 INCLUDE_DIRECTORIES(${PROJECT_SOURCE_DIR}/src/CtCommon/src)
 INCLUDE_DIRECTORIES(${PROJECT_SOURCE_DIR}/src/CtMemory/src)
+INCLUDE_DIRECTORIES(${PROJECT_SOURCE_DIR}/src/CtSocket/src)
 INCLUDE_DIRECTORIES(${PROJECT_SOURCE_DIR}/src/CtThread/src)
+INCLUDE_DIRECTORIES(${PROJECT_SOURCE_DIR}/src/CtTimer/src)
+INCLUDE_DIRECTORIES(${PROJECT_SOURCE_DIR}/src/CtUuid/src)
 INCLUDE_DIRECTORIES(${PROJECT_SOURCE_DIR}/src/CtBonjour/src)
 
 #--------------------------------------------------------------------------------------
