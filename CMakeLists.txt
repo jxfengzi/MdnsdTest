@@ -44,29 +44,20 @@ ENDIF(WIN32)
 # WIN32
 #---------------------------------------------------------------------------------------
 IF(WIN32)
-    #ADD_DEFINITIONS(-D__USE_LIB_AO__)
-
 	ADD_DEFINITIONS(-D_CRT_SECURE_NO_WARNINGS -D_SCL_SECURE_NO_WARNINGS)
-	
-	# unicode for windows
     ADD_DEFINITIONS(-DUNICODE -D_UNICODE)
-   
-    # bonjour for windows
-    ADD_DEFINITIONS(-D__APPLE_BONJOUR__)
 ELSE(WIN32)
     #---------------------------------------------------------------------------------------
     # APPLE MACOSX
     #---------------------------------------------------------------------------------------
     IF(APPLE)
-        MESSAGE(STATUS "build airjoy for osx")
 	    ADD_DEFINITIONS(-D__MAC_OSX__)
 	    ADD_DEFINITIONS(-fPIC)
     #---------------------------------------------------------------------------------------
     # Linux
     #---------------------------------------------------------------------------------------
     ELSE(APPLE)
-        #ADD_DEFINITIONS(-D__USE_LIB_AO__)
-        ADD_DEFINITIONS(-D__APPLE_BONJOUR__)
+        ADD_DEFINITIONS(-D__LINUX__)
 	    ADD_DEFINITIONS(-fPIC)
     ENDIF(APPLE)
 ENDIF(WIN32)
@@ -77,6 +68,10 @@ ENDIF(WIN32)
 #
 #---------------------------------------------------------------------------------------
 INCLUDE_DIRECTORIES(${PROJECT_SOURCE_DIR}/mdnsresponder/mDNSShared)
+INCLUDE_DIRECTORIES(${PROJECT_SOURCE_DIR}/src/CtCommon/src)
+INCLUDE_DIRECTORIES(${PROJECT_SOURCE_DIR}/src/CtMemory/src)
+INCLUDE_DIRECTORIES(${PROJECT_SOURCE_DIR}/src/CtThread/src)
+INCLUDE_DIRECTORIES(${PROJECT_SOURCE_DIR}/src/CtBonjour/src)
 
 #--------------------------------------------------------------------------------------
 #
