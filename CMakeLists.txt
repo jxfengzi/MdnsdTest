@@ -75,6 +75,7 @@ INCLUDE_DIRECTORIES(${PROJECT_SOURCE_DIR}/src/CtThread/src)
 INCLUDE_DIRECTORIES(${PROJECT_SOURCE_DIR}/src/CtTimer/src)
 INCLUDE_DIRECTORIES(${PROJECT_SOURCE_DIR}/src/CtUuid/src)
 INCLUDE_DIRECTORIES(${PROJECT_SOURCE_DIR}/src/CtBonjour/src)
+INCLUDE_DIRECTORIES(${PROJECT_SOURCE_DIR}/src/test)
 
 #--------------------------------------------------------------------------------------
 #
@@ -101,7 +102,7 @@ MESSAGE(STATUS "3rdpart Library Dir : " ${LIB_DIR})
 #
 #--------------------------------------------------------------------------------------
 IF (WIN32)
-  SET(OS_LIB Iphlpapi.lib winmm.lib)
+  SET(OS_LIB ws2_32.lib Iphlpapi.lib winmm.lib)
   SET(DNSSD_LIB dnssd.lib) 
 ELSE (WIN32)
   SET(OS_LIB pthread dl)

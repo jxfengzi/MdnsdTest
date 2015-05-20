@@ -67,7 +67,10 @@ void DNSSD_API address_reply(DNSServiceRef sdRef,
 struct _CtBonjour
 {
     CtThread *thread;
-    DNSServiceRef dnsSvcRef;
+	DNSServiceRef shareRef;
+	DNSServiceRef browseRef;
+	DNSServiceRef resolveRef;
+	DNSServiceRef resolveAddrRef;
     bool serviceDiscoveryStarted;
 	bool threadShouldExit;
 	double timeoutInSeconds;
@@ -110,6 +113,12 @@ CtRet CtBonjour_Construct(CtBonjour *thiz)
     do
     {
         memset(thiz, 0, sizeof(CtBonjour));
+
+		thiz->shareRef = NULL;
+		thiz->browseRef = NULL;
+		thiz->resolveRef = NULL;
+		thiz->resolveAddrRef = NULL;
+
         thiz->serviceDiscoveryStarted = false;
 		thiz->threadShouldExit = false;
 		thiz->timeoutInSeconds = 0.0;
@@ -160,12 +169,12 @@ CtRet CtBonjour_DiscoverService(CtBonjour *thiz, const char *type, const char *d
     do{
         if (thiz->serviceDiscoveryStarted)
         {
-			LOG_W(TAG, "serviceDiscoveryStarted");
+			LOG_W(TAG, "serviceDiscovery already Started");
             ret = CT_RET_E_STARTED;
             break;
         }
 
-        err = DNSServiceCreateConnection (&(thiz->dnsSvcRef));
+		err = DNSServiceCreateConnection(&(thiz->shareRef));
         if (err != kDNSServiceErr_NoError)
         {
 			LOG_W(TAG, "DNSServiceCreateConnection failed: %d", err);
@@ -173,20 +182,22 @@ CtRet CtBonjour_DiscoverService(CtBonjour *thiz, const char *type, const char *d
             break;
         }
 
-        err = DNSServiceBrowse (&(thiz->dnsSvcRef),
+		thiz->browseRef = thiz->shareRef;
+
+		err = DNSServiceBrowse(&(thiz->browseRef),
                 flag, 
                 interfaceIndex, 
                 type, 
 				domain,
                 browse_reply, 
-                ctx);
+                thiz);
         if (err != kDNSServiceErr_NoError)
         {
             LOG_W(TAG, "DNSServiceBrowse failed: %d", err);
 			ret = CT_RET_E_INTERNAL;
 
-            DNSServiceRefDeallocate(thiz->dnsSvcRef);
-            thiz->dnsSvcRef = NULL;
+			DNSServiceRefDeallocate(thiz->shareRef);
+			thiz->shareRef = NULL;
             break;
         }
 
@@ -222,10 +233,10 @@ CtRet CtBonjour_StopServiceDiscovery(CtBonjour *thiz)
             break;
         }
 
-        if (thiz->dnsSvcRef != NULL) 
+		if (thiz->shareRef != NULL)
         {
-            DNSServiceRefDeallocate(thiz->dnsSvcRef);
-            thiz->dnsSvcRef = NULL;
+			DNSServiceRefDeallocate(thiz->shareRef);
+			thiz->shareRef = NULL;
         }
 
         thiz->threadShouldExit = true;
@@ -240,6 +251,8 @@ static
 bool event_poll(DNSServiceRef *ref, double timeoutInSeconds, DNSServiceErrorType *err)
 {
     *err = kDNSServiceErr_NoError;
+
+	//LOG_I(TAG, "event_poll");
 
     fd_set readfds;
     FD_ZERO(&readfds);
@@ -267,10 +280,12 @@ void event_loop(void *param)
 {
     CtBonjour *thiz = (CtBonjour *)param;
 
+	LOG_I(TAG, "serviceDiscoveryStarted");
+
     while (! thiz->threadShouldExit)
     {
         DNSServiceErrorType err = kDNSServiceErr_NoError;
-        if (event_poll(&thiz->dnsSvcRef, thiz->timeoutInSeconds, &err))
+		if (event_poll(&thiz->shareRef, thiz->timeoutInSeconds, &err))
         {
             if (err > 0)
             {
@@ -279,6 +294,8 @@ void event_loop(void *param)
             }
         }
     }
+
+	LOG_I(TAG, "serviceDiscoveryStopped");
 }
 
 static 
@@ -291,15 +308,16 @@ void DNSSD_API browse_reply (DNSServiceRef sdref,
                    const char *replyDomain, 
                    void *ctx)
 {
-	CtBonjour *bonjour = (CtBonjour *)ctx;
+	CtBonjour *thiz = (CtBonjour *)ctx;
 
     printf("browse_reply\r\n");
 
     if (flags & kDNSServiceFlagsAdd) 
     {
         printf("ServiceFound: %s %s %s\n", replyName, replyType, replyDomain);
+		thiz->resolveRef = thiz->shareRef;
 
-        DNSServiceResolve (&(bonjour->dnsSvcRef),
+		DNSServiceResolve(&(thiz->resolveRef),
                            kDNSServiceFlagsShareConnection,
                            ifIndex,
                            replyName,
@@ -326,7 +344,7 @@ void DNSSD_API resolve_reply(DNSServiceRef sdRef,
                     const unsigned char *txtRecord, 
                     void *ctx)
 {
-	CtBonjour *bonjour = (CtBonjour *)ctx;
+	CtBonjour *thiz = (CtBonjour *)ctx;
 
     printf("resolve_reply\r\n");
     printf("fullresolvename: %s\n", fullresolvename);
@@ -334,9 +352,10 @@ void DNSSD_API resolve_reply(DNSServiceRef sdRef,
     printf("port: %d\n", opaqueport);
     printf("txtlen: %d\n", txtLen);
     printf("txtRecord: %s\n", txtRecord);
+	
+	thiz->resolveAddrRef = thiz->shareRef;
 
-    DNSServiceGetAddrInfo (
-            &(bonjour->dnsSvcRef),
+    DNSServiceGetAddrInfo (&(thiz->resolveAddrRef),
             kDNSServiceFlagsShareConnection,
             interfaceIndex,
             kDNSServiceProtocol_IPv4,

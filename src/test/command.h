@@ -19,7 +19,7 @@
 CT_BEGIN_DECLS
 
 
-void cmd_run();
+void cmd_loop();
 
 
 CT_END_DECLS

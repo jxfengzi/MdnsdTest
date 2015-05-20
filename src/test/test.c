@@ -3,6 +3,9 @@
 #include <string.h>
 
 #include "CtBonjour.h"
+#include "ct_socket.h"
+
+#include "command.h"
 
 int main()
 {
@@ -20,7 +23,7 @@ int main()
 
         CtBonjour_DiscoverService(bonjour, "_airplay._tcp", "local.", NULL);
 
-        cmd_run();
+		cmd_loop();
 
     } while (0);
 
