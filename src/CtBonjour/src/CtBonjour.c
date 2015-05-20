@@ -11,21 +11,29 @@
  */
 
 #include "CtBonjour.h"
+#include "CtThread.h"
+#include "ct_memory.h"
+#include "ct_log.h"
+#include <math.h>
 
-static 
-CtRet CtThread_Construct(CtThread *thiz);
+#include "dns_sd.h"
+
+#define TAG		"CtBonjour"
 
 static
-CtRet CtThread_Dispose(CtThread *thiz);
+CtRet CtBonjour_Construct(CtBonjour *thiz);
 
 static
-bool event_poll(DNSServiceRef ref, double timeoutInSeconds, DNSServiceErrorType *err);
+CtRet CtBonjour_Construct(CtBonjour *thiz);
+
+static
+bool event_poll(DNSServiceRef *ref, double timeoutInSeconds, DNSServiceErrorType *err);
 
 static
 void event_loop(void *param);
 
 static 
-void browse_reply (DNSServiceRef sdref, 
+void DNSSD_API browse_reply(DNSServiceRef sdref,
                    const DNSServiceFlags flags, 
                    uint32_t ifIndex, 
                    DNSServiceErrorType errorCode,
@@ -35,7 +43,7 @@ void browse_reply (DNSServiceRef sdref,
                    void *ctx);
 
 static
-void resolve_reply (DNSServiceRef sdRef,
+void DNSSD_API resolve_reply(DNSServiceRef sdRef,
                     DNSServiceFlags flags, 
                     uint32_t interfaceIndex, 
                     DNSServiceErrorType errorCode,
@@ -47,7 +55,7 @@ void resolve_reply (DNSServiceRef sdRef,
                     void *ctx);
 
 static 
-void address_reply (DNSServiceRef sdRef,
+void DNSSD_API address_reply(DNSServiceRef sdRef,
                     DNSServiceFlags flags, 
                     uint32_t interfaceIndex, 
                     DNSServiceErrorType errorCode, 
@@ -61,6 +69,8 @@ struct _CtBonjour
     CtThread *thread;
     DNSServiceRef dnsSvcRef;
     bool serviceDiscoveryStarted;
+	bool threadShouldExit;
+	double timeoutInSeconds;
 };
 
 CtBonjour * CtBonjour_New(void)
@@ -101,12 +111,14 @@ CtRet CtBonjour_Construct(CtBonjour *thiz)
     {
         memset(thiz, 0, sizeof(CtBonjour));
         thiz->serviceDiscoveryStarted = false;
+		thiz->threadShouldExit = false;
+		thiz->timeoutInSeconds = 0.0;
 
         thiz->thread = CtThread_New();
-        if (thiz->thread == null)
+        if (thiz->thread == NULL)
         {
             LOG_W(TAG, "CtThread_New() failed");
-            ret = CT_RET_NEW;
+			ret = CT_RET_E_NEW;
             break;
         }
 
@@ -122,7 +134,7 @@ CtRet CtBonjour_Dispose(CtBonjour *thiz)
 {
     RETURN_VAL_IF_FAIL(thiz, CT_RET_E_ARG_NULL);
 
-    CtBonjour_Stop(thiz);
+	CtBonjour_StopServiceDiscovery(thiz);
     CtThread_Delete(thiz->thread);
 
     return CT_RET_OK;
@@ -148,7 +160,7 @@ CtRet CtBonjour_DiscoverService(CtBonjour *thiz, const char *type, const char *d
     do{
         if (thiz->serviceDiscoveryStarted)
         {
-            LOG_W("serviceDiscoveryStarted");
+			LOG_W(TAG, "serviceDiscoveryStarted");
             ret = CT_RET_E_STARTED;
             break;
         }
@@ -156,38 +168,41 @@ CtRet CtBonjour_DiscoverService(CtBonjour *thiz, const char *type, const char *d
         err = DNSServiceCreateConnection (&(thiz->dnsSvcRef));
         if (err != kDNSServiceErr_NoError)
         {
-            LOG_W("DNSServiceCreateConnection failed: %d", err);
-            ret = CT_RET_E_FAILED;
+			LOG_W(TAG, "DNSServiceCreateConnection failed: %d", err);
+			ret = CT_RET_E_INTERNAL;
             break;
         }
 
         err = DNSServiceBrowse (&(thiz->dnsSvcRef),
                 flag, 
                 interfaceIndex, 
-                serviceType, 
-                domainName, 
+                type, 
+				domain,
                 browse_reply, 
                 ctx);
         if (err != kDNSServiceErr_NoError)
         {
-            LOG_W("DNSServiceBrowse failed: %d", err);
-            ret = CT_RET_E_FAILED;
+            LOG_W(TAG, "DNSServiceBrowse failed: %d", err);
+			ret = CT_RET_E_INTERNAL;
 
             DNSServiceRefDeallocate(thiz->dnsSvcRef);
             thiz->dnsSvcRef = NULL;
             break;
         }
 
-        ret = CtThread_Initialize(&thiz->thread, event_loop, thiz, "mdns");
+        ret = CtThread_Initialize(thiz->thread, event_loop, thiz, "mdns");
         if (RET_FAILED(ret))
         {
             LOG_W(TAG, "CtThread_Initialize failed");
-            ret = CT_RET_FAILED;
+			ret = CT_RET_E_INTERNAL;
             break;
         }
 
-        CtThread_Start(&thiz->thread);
-        thiz->serviceDiscoveryStarted = true;
+		thiz->timeoutInSeconds = 1.0;
+		thiz->threadShouldExit = false;
+		thiz->serviceDiscoveryStarted = true;
+
+        CtThread_Start(thiz->thread);
 
         ret = CT_RET_OK;
     } while (0);
@@ -203,7 +218,6 @@ CtRet CtBonjour_StopServiceDiscovery(CtBonjour *thiz)
     {
         if (! thiz->serviceDiscoveryStarted)
         {
-            LOG_W("serviceDiscovery not Started");
             ret = CT_RET_E_STOPPED;
             break;
         }
@@ -215,7 +229,7 @@ CtRet CtBonjour_StopServiceDiscovery(CtBonjour *thiz)
         }
 
         thiz->threadShouldExit = true;
-        CtThread_Join(&thiz->thread);
+        CtThread_Join(thiz->thread);
     }
     while (0);
 
@@ -223,7 +237,7 @@ CtRet CtBonjour_StopServiceDiscovery(CtBonjour *thiz)
 }
 
 static
-bool event_poll(DNSServiceRef ref, double timeoutInSeconds, DNSServiceErrorType *err)
+bool event_poll(DNSServiceRef *ref, double timeoutInSeconds, DNSServiceErrorType *err)
 {
     *err = kDNSServiceErr_NoError;
 
@@ -235,13 +249,13 @@ bool event_poll(DNSServiceRef ref, double timeoutInSeconds, DNSServiceErrorType 
     FD_SET(fd, &readfds);
 
     struct timeval tv;
-    tv.tv_sec = long(floor(timeoutInSeconds));
-    tv.tv_usec = long(1000000*(timeoutInSeconds - tv.tv_sec));
+    tv.tv_sec = (long)(floor(timeoutInSeconds));
+    tv.tv_usec = (long)(1000000*(timeoutInSeconds - tv.tv_sec));
 
     int result = select(nfds, &readfds, NULL, NULL, &tv);
     if (result>0 && FD_ISSET(fd, &readfds))
     {
-        err = DNSServiceProcessResult(*dnsServiceRef);
+		*err = DNSServiceProcessResult(*ref);
         return true;
     }
 
@@ -256,7 +270,7 @@ void event_loop(void *param)
     while (! thiz->threadShouldExit)
     {
         DNSServiceErrorType err = kDNSServiceErr_NoError;
-        if (event_poll(thiz->dnsSvcRef, thiz->timeoutInSeconds, &err))
+        if (event_poll(&thiz->dnsSvcRef, thiz->timeoutInSeconds, &err))
         {
             if (err > 0)
             {
@@ -268,7 +282,7 @@ void event_loop(void *param)
 }
 
 static 
-void browse_reply (DNSServiceRef sdref, 
+void DNSSD_API browse_reply (DNSServiceRef sdref, 
                    const DNSServiceFlags flags, 
                    uint32_t ifIndex, 
                    DNSServiceErrorType errorCode,
@@ -277,7 +291,7 @@ void browse_reply (DNSServiceRef sdref,
                    const char *replyDomain, 
                    void *ctx)
 {
-    Bonjour *bonjour = (Bonjour *)ctx;
+	CtBonjour *bonjour = (CtBonjour *)ctx;
 
     printf("browse_reply\r\n");
 
@@ -301,7 +315,7 @@ void browse_reply (DNSServiceRef sdref,
 }
 
 static
-void resolve_reply (DNSServiceRef sdRef,
+void DNSSD_API resolve_reply(DNSServiceRef sdRef,
                     DNSServiceFlags flags, 
                     uint32_t interfaceIndex, 
                     DNSServiceErrorType errorCode,
@@ -312,7 +326,7 @@ void resolve_reply (DNSServiceRef sdRef,
                     const unsigned char *txtRecord, 
                     void *ctx)
 {
-    Bonjour *bonjour = (Bonjour *)ctx;
+	CtBonjour *bonjour = (CtBonjour *)ctx;
 
     printf("resolve_reply\r\n");
     printf("fullresolvename: %s\n", fullresolvename);
@@ -332,7 +346,7 @@ void resolve_reply (DNSServiceRef sdRef,
 }
 
 static 
-void address_reply (DNSServiceRef sdRef,
+void DNSSD_API address_reply(DNSServiceRef sdRef,
                     DNSServiceFlags flags, 
                     uint32_t interfaceIndex, 
                     DNSServiceErrorType errorCode, 

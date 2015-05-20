@@ -10,13 +10,15 @@ int main()
 
     do
     {
+		ct_socket_init();
+
         bonjour = CtBonjour_New();
-        if (bonjour == null)
+        if (bonjour == NULL)
         {
             break;
         }
 
-        CtBonjour_DiscoverService(bonjour, "_airplay._tcp", "local.");
+        CtBonjour_DiscoverService(bonjour, "_airplay._tcp", "local.", NULL);
 
         cmd_run();
 
