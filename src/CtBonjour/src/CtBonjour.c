@@ -333,6 +333,48 @@ void DNSSD_API browse_reply (DNSServiceRef sdref,
 }
 
 static
+void setTXTRecordData(uint16_t txtLen, const unsigned char *txtRecord)
+{
+    if (txtLen < 2)
+        return;
+
+    int i = 0;
+    char buf[256];
+    char key[256];
+    char value[256];
+
+    printf("---------------------------------\r\n");
+
+    unsigned char length = txtRecord[i];
+    while (i < txtLen)
+    {
+        const unsigned char *start = txtRecord + (i+1);
+        memset(buf, 0, 256);
+        memcpy(buf, start, length);
+        buf[256-1] = 0;
+
+        i = i + length + 1;
+        length = txtRecord[i];
+
+        char *p = strstr(buf, "=");
+        if (p)
+        {
+            memset(key, 0, 256);
+            memcpy(key,  buf, p - buf);
+            p++;
+
+            memset(value, 0, 256);
+            memcpy(value,  p, strlen(p));
+            value[256-1] = 0;
+
+            printf("%s=%s\r\n", key, value);
+        }
+    }
+
+    printf("---------------------------------\r\n");
+}
+
+static
 void DNSSD_API resolve_reply(DNSServiceRef sdRef,
                     DNSServiceFlags flags, 
                     uint32_t interfaceIndex, 
@@ -349,9 +391,11 @@ void DNSSD_API resolve_reply(DNSServiceRef sdRef,
     printf("resolve_reply\r\n");
     printf("fullresolvename: %s\n", fullresolvename);
     printf("hosttarget: %s\n", hosttarget);
-    printf("port: %d\n", opaqueport);
+    printf("port: %d\n", ntohs(opaqueport));
     printf("txtlen: %d\n", txtLen);
-    printf("txtRecord: %s\n", txtRecord);
+//    printf("txtRecord: %s\n", txtRecord);
+
+    setTXTRecordData(txtLen, txtRecord);
 	
 	thiz->resolveAddrRef = thiz->shareRef;
 
