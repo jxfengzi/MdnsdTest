@@ -62,7 +62,7 @@ void cmd_loop()
 		command(buf);
 	}
 }
-#else /* Linux 
+#else /* Linux */
 static
 void cmd_post_select(fd_set *p_read_set, fd_set *p_write_set, fd_set *p_error_set)
 {
